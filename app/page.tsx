@@ -1,104 +1,99 @@
 "use client";
 
-import {
-  useMiniKit,
-  useAddFrame,
-  useOpenUrl,
-} from "@coinbase/onchainkit/minikit";
-import { Name, Identity, Badge } from "@coinbase/onchainkit/identity";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Snake from "./components/snake";
+import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
-import Check from "./svg/Check";
+import { setApiKey } from "@/lib/api";
+import UserSearch from "./components/user-search";
+import Dashboard from "./components/dashboard";
+import Notifications from "./components/notifications";
+import { Button } from "./components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { Name, Identity } from "@coinbase/onchainkit/identity";
 
+// Farcaster Schema UID
 const SCHEMA_UID =
   "0x7889a09fb295b0a0c63a3d7903c4f00f7896cca4fa64d2c1313f8547390b7d39";
 
 export default function App() {
-  const { setFrameReady, isFrameReady, context } = useMiniKit();
-  const [frameAdded, setFrameAdded] = useState(false);
+  const { address, isConnected } = useAccount();
+  const [currentUserFid, setCurrentUserFid] = useState<number | undefined>();
+  const [apiKeySet, setApiKeySet] = useState(false);
 
-  const addFrame = useAddFrame();
-  const openUrl = useOpenUrl();
-  const { address } = useAccount();
-
+  // Set API key from environment variables
   useEffect(() => {
-    if (!isFrameReady) {
-      setFrameReady();
+    const apiKey = process.env.NEXT_PUBLIC_FARCASTER_API_KEY;
+    if (apiKey) {
+      setApiKey(apiKey);
+      setApiKeySet(true);
     }
-  }, [setFrameReady, isFrameReady]);
+  }, []);
 
-  const handleAddFrame = useCallback(async () => {
-    const frameAdded = await addFrame();
-    setFrameAdded(Boolean(frameAdded));
-  }, [addFrame, setFrameAdded]);
-
-  const saveFrameButton = useMemo(() => {
-    if (context && !context.client.added) {
-      return (
-        <button
-          type="button"
-          onClick={handleAddFrame}
-          className="cursor-pointer bg-transparent font-semibold text-sm"
-        >
-          + SAVE FRAME
-        </button>
-      );
+  // Mock function to get FID from connected wallet
+  // In a real app, you would use the Farcaster SDK to get the user's FID
+  useEffect(() => {
+    if (isConnected && address) {
+      // This is a mock implementation - in a real app, you would fetch the user's FID
+      // For demo purposes, we'll set a mock FID
+      setCurrentUserFid(12345);
+    } else {
+      setCurrentUserFid(undefined);
     }
-
-    if (frameAdded) {
-      return (
-        <div className="flex items-center space-x-1 text-sm font-semibold animate-fade-out">
-          <Check />
-          <span>SAVED</span>
-        </div>
-      );
-    }
-
-    return null;
-  }, [context, handleAddFrame, frameAdded]);
+  }, [isConnected, address]);
 
   return (
-    <div className="flex flex-col min-h-screen sm:min-h-[820px] font-sans bg-[#E5E5E5] text-black items-center snake-dark relative">
-      <div className="w-screen max-w-[520px]">
-        <header className="mr-2 mt-1 flex justify-between">
-          <div className="justify-start pl-1">
-            {address ? (
-              <Identity
-                address={address}
-                schemaId={SCHEMA_UID}
-                className="!bg-inherit p-0 [&>div]:space-x-2"
-              >
-                <Name className="text-inherit">
-                  <Badge
-                    tooltip="High Scorer"
-                    className="!bg-inherit high-score-badge"
-                  />
-                </Name>
-              </Identity>
-            ) : (
-              <div className="pl-2 pt-1 text-gray-500 text-sm font-semibold">
-                NOT CONNECTED
-              </div>
-            )}
+    <div className="min-h-screen bg-background">
+      <header className="border-b">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">WarpMeet</h1>
+          
+          <div className="flex items-center gap-4">
+            <Notifications currentUserFid={currentUserFid} />
+            
+            <div>
+              {address ? (
+                <Identity
+                  address={address}
+                  schemaId={SCHEMA_UID}
+                  className="!bg-inherit p-0 [&>div]:space-x-2"
+                >
+                  <Name className="text-inherit" />
+                </Identity>
+              ) : (
+                <Button>Connect Wallet</Button>
+              )}
+            </div>
           </div>
-          <div className="pr-1 justify-end">{saveFrameButton}</div>
-        </header>
+        </div>
+      </header>
 
-        <main className="font-serif">
-          <Snake />
-        </main>
+      <main className="container mx-auto px-4 py-8">
+        <Tabs defaultValue="search" className="w-full">
+          <TabsList className="mb-8">
+            <TabsTrigger value="search">Find Users</TabsTrigger>
+            <TabsTrigger value="dashboard">My Dashboard</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="search" className="mt-6">
+            <div className="max-w-5xl mx-auto">
+              <h2 className="text-2xl font-bold mb-6">Find Farcaster Users to Meet</h2>
+              <UserSearch currentUserFid={currentUserFid} />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="dashboard" className="mt-6">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-2xl font-bold mb-6">Your Meeting Dashboard</h2>
+              <Dashboard currentUserFid={currentUserFid} />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
 
-        <footer className="absolute bottom-4 flex items-center w-screen max-w-[520px] justify-center">
-          <button
-            type="button"
-            className="mt-4 ml-4 px-2 py-1 flex justify-start rounded-2xl font-semibold opacity-40 border border-black text-xs"
-            onClick={() => openUrl("https://base.org/builders/minikit")}
-          >
-            BUILT ON BASE WITH MINIKIT
-          </button>
-        </footer>
-      </div>
+      <footer className="border-t mt-12">
+        <div className="container mx-auto px-4 py-6 text-center text-muted-foreground">
+          <p>WarpMeet - Schedule meetings with Farcaster users</p>
+        </div>
+      </footer>
     </div>
   );
 }
